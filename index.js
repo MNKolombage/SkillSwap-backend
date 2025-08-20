@@ -14,7 +14,7 @@ app.use(express.json());
 // Enable CORS for frontend
 app.use(cors({
   origin: "http://localhost:3000",  // your React app URL
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
   credentials: true
 }));
 

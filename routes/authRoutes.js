@@ -66,4 +66,46 @@ router.post('/signin', async (req, res) => {
   }
 });
 
+// ================= Get Profile =================
+router.get('/profile/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password"); // exclude password
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.status(200).json({ user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ================= Update Profile Route =================
+router.patch('/update-profile/:id', async (req, res) => {
+  const { id } = req.params;
+  const { homeTown, age, currentPosition, skillsWanted, skillsOffered } = req.body;
+
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      {
+        homeTown,
+        age,
+        currentPosition,
+        skillsWanted,
+        skillsOffered,
+      },
+      { new: true } // return updated document
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'Profile updated successfully', user: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 export default router;
