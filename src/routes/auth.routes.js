@@ -1,13 +1,29 @@
-// server/src/routes/auth.routes.js
+// src/routes/auth.routes.js
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import validator from "validator";
+import rateLimit from "express-rate-limit";
 import { User } from "../models/User.js";
-import { authLimiter, signupLimiter } from "../middleware/limits.js";
-import { validateEmail, validatePassword, validateFullName } from "../utils/validate.js";
 
 const router = Router();
 
+// ----- rate limits (declare once) -----
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ----- helpers -----
 function sign(userId) {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
 }
@@ -17,67 +33,86 @@ function setAuthCookie(res, token) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: 7 * 24 * 60 * 60 * 1000
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 }
 
-/**
- * POST /api/auth/signup
- * body: { fullName, email, password }
- * returns: { message }
- */
+// ----- routes -----
+
+// POST /api/auth/signup
 router.post("/signup", signupLimiter, async (req, res) => {
   try {
-    const nameCheck = validateFullName(req.body.fullName);
-    if (!nameCheck.ok) return res.status(400).json({ message: nameCheck.message });
+    let { fullName, email, password } = req.body;
+    fullName = (fullName || "").trim();
+    email = (email || "").trim().toLowerCase();
 
-    const emailCheck = validateEmail(req.body.email);
-    if (!emailCheck.ok) return res.status(400).json({ message: emailCheck.message });
-
-    const passCheck = validatePassword(req.body.password);
-    if (!passCheck.ok) return res.status(400).json({ message: passCheck.message });
-
-    const email = emailCheck.email;
-    const fullName = nameCheck.fullName;
-    const passwordHash = await bcrypt.hash(req.body.password, 12);
+    if (!fullName || !email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Full name, email and password are required" });
+    }
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ message: "Please enter a valid email address" });
+    }
+    if (
+      password.length < 8 ||
+      !/[a-z]/.test(password) ||
+      !/[A-Z]/.test(password) ||
+      !/[0-9]/.test(password) ||
+      !/[^\w\s]/.test(password)
+    ) {
+      return res.status(400).json({
+        message: "Weak password: min 8 chars with upper, lower, number, symbol",
+      });
+    }
 
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ message: "Email is already registered" });
 
+    const passwordHash = await bcrypt.hash(password, 12);
     const user = await User.create({ fullName, email, passwordHash });
 
     const token = sign(user._id.toString());
     setAuthCookie(res, token);
 
-    return res.status(201).json({ message: "Account created successfully" });
-  } catch (err) {
-    console.error("signup error:", err);
-    return res.status(500).json({ message: "Failed to sign up" });
+    res.status(201).json({ message: "Account created successfully" });
+  } catch (e) {
+    console.error("signup error:", e);
+    res.status(500).json({ message: "Failed to sign up" });
   }
 });
 
-/**
- * POST /api/auth/signin
- * body: { email, password }
- * returns: { user }
- */
+// POST /api/auth/signin
 router.post("/signin", authLimiter, async (req, res) => {
   try {
-    const emailCheck = validateEmail(req.body.email);
-    if (!emailCheck.ok) return res.status(400).json({ message: emailCheck.message });
+    let { email, password } = req.body;
+    email = (email || "").trim().toLowerCase();
 
-    const password = String(req.body.password || "");
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ message: "Please enter a valid email address" });
+    }
     if (!password) return res.status(400).json({ message: "Password is required" });
 
-    const user = await User.findOne({ email: emailCheck.email });
-    // Always take constant time-ish for error responses to reduce user enumeration hints
-    if (!user) {
-      await new Promise(r => setTimeout(r, 250));
+    const user = await User.findOne({ email });
+
+    // reduce user-enumeration signals
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    if (!user || typeof user.passwordHash !== "string" || !user.passwordHash.startsWith("$2")) {
+      await sleep(250);
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ message: "Invalid credentials" });
+    let ok = false;
+    try {
+      ok = await bcrypt.compare(password, user.passwordHash);
+    } catch {
+      await sleep(250);
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+    if (!ok) {
+      await sleep(250);
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
     const token = sign(user._id.toString());
     setAuthCookie(res, token);
@@ -87,7 +122,7 @@ router.post("/signin", authLimiter, async (req, res) => {
       fullName: user.fullName,
       email: user.email,
       avatarUrl: user.avatarUrl || "",
-      role: user.role || "Both"
+      role: user.role || "Both",
     };
 
     return res.json({ user: safeUser });
@@ -97,10 +132,7 @@ router.post("/signin", authLimiter, async (req, res) => {
   }
 });
 
-/**
- * GET /api/auth/me
- * returns logged-in user or null
- */
+// GET /api/auth/me
 router.get("/me", async (req, res) => {
   try {
     const token = req.cookies?.[process.env.COOKIE_NAME];
@@ -113,9 +145,7 @@ router.get("/me", async (req, res) => {
   }
 });
 
-/**
- * POST /api/auth/signout
- */
+// POST /api/auth/signout
 router.post("/signout", (req, res) => {
   res.clearCookie(process.env.COOKIE_NAME).json({ ok: true });
 });
