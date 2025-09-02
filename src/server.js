@@ -6,6 +6,8 @@ import morgan from "morgan";
 import { connectDB } from "./db.js";
 
 import authRoutes from "./routes/auth.routes.js";
+import usersRoutes from "./routes/users.routes.js";
+import skillsRoutes from "./routes/skills.routes.js";
 import helmet from "helmet";
 
 const app = express();
@@ -23,6 +25,8 @@ app.use(morgan("dev"));
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 app.use("/api/auth", authRoutes);
+app.use("/api/users", usersRoutes);
+app.use("/api/skills", skillsRoutes);
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
