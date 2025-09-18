@@ -58,7 +58,8 @@ router.get("/", async (req, res) => {
     query = User.find({
       ...filter,
       $or: [
-        { fullName: { $regex: q, $options: "i" } },
+        { firstName: { $regex: q, $options: "i" } },
+        { lastName: { $regex: q, $options: "i" } },
         { skillsOffered: { $elemMatch: { $regex: q, $options: "i" } } },
         { skillsWanted: { $elemMatch: { $regex: q, $options: "i" } } }
       ]
@@ -70,6 +71,45 @@ router.get("/", async (req, res) => {
   const totalPages = Math.max(Math.ceil(total / limitNum), 1);
 
   res.json({ data, page: pageNum, total, totalPages });
+});
+
+
+// PATCH /api/users/profile – update currently logged in user
+router.patch("/profile", async (req, res) => {
+  try {
+    const token = req.cookies?.[process.env.COOKIE_NAME];
+    if (!token) return res.status(401).json({ message: "Not signed in" });
+
+    const { id } = jwt.verify(token, process.env.JWT_SECRET);
+    let user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Only update allowed fields
+    const allowedFields = [
+      "firstName",
+      "lastName",
+      "homeTown",
+      "age",
+      "currentPosition",
+      "skillsWanted",
+      "skillsOffered",
+      "avatarUrl",
+      "role",
+      "location",
+    ];
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        user[field] = req.body[field];
+      }
+    });
+
+    user = await user.save();
+
+    res.json({ user: user.toObject({ versionKey: false }) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error updating profile" });
+  }
 });
 
 export default router;

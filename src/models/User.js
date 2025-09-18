@@ -1,16 +1,24 @@
 // src/models/User.js
 import mongoose from "mongoose";
 
-const UserSchema = new mongoose.Schema({
-  fullName: { type: String, required: true, trim: true, index: true },
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
   passwordHash: { type: String, required: true },
-  bio: { type: String, default: "" },
-  avatarUrl: { type: String, default: "" },
-  role: { type: String, enum: ["Learner","Mentor","Both"], default: "Both", index: true },
-  skillsOffered: { type: [String], default: [], index: true },
-  skillsWanted: { type: [String], default: [], index: true },
-  location: { type: String, default: "", index: true }
-}, { timestamps: true });
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  role: { 
+    type: String, 
+    enum: ["Learner", "Mentor", "Both"], 
+    default: "Both" 
+  },
+  homeTown: String,
+  age: Number,
+  currentPosition: String,
+  skillsWanted: [String],
+  skillsOffered: [String],
+  avatarUrl: String,
+  location: String,
+  createdAt: { type: Date, default: Date.now }
+});
 
-export const User = mongoose.model("User", UserSchema);
+export const User = mongoose.model("User", userSchema);
