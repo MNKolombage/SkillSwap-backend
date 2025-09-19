@@ -8,6 +8,7 @@ import { connectDB } from "./db.js";
 import authRoutes from "./routes/auth.routes.js";
 import usersRoutes from "./routes/users.routes.js";
 import skillsRoutes from "./routes/skills.routes.js";
+import swapsRoutes from "./routes/swaps.routes.js";
 import helmet from "helmet";
 
 if (!process.env.JWT_SECRET) { console.error("❌ Missing JWT_SECRET"); process.exit(1); }
@@ -33,6 +34,7 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/skills", skillsRoutes);
+app.use("/api/swaps", swapsRoutes);
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
