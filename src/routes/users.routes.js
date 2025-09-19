@@ -5,12 +5,21 @@ import jwt from "jsonwebtoken";
 
 const router = Router();
 
-/**
- * GET /api/users
- * Query: q, offered=React,Node, wanted=Python, role=Both, location=Colombo, page=1, limit=12
- * Response: { data, page, total, totalPages }
- */
-
+// GET /api/users/:id - get user by id (public profile)
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ message: "Invalid user id" });
+  }
+  try {
+    const user = await User.findById(id).select("-passwordHash");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching user" });
+  }
+});
 router.get("/", async (req, res) => {
   const {
     q = "",
