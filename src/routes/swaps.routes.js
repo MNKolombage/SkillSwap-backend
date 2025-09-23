@@ -32,8 +32,8 @@ router.get("/mine", authRequired, async (req, res) => {
     $or: [{ from: userId }, { to: userId }]
   })
     .sort({ createdAt: -1 })
-    .populate("from", "fullName avatarUrl")
-    .populate("to", "fullName avatarUrl")
+  .populate("from", "firstName lastName fullName avatarUrl")
+  .populate("to", "firstName lastName fullName avatarUrl")
     .lean();
 
   res.json(swaps);
@@ -70,7 +70,7 @@ router.get("/received", authRequired, async (req, res) => {
   const userId = req.user.id;
   const swaps = await SwapRequest.find({ to: userId })
     .sort({ createdAt: -1 })
-    .populate("from", "fullName avatarUrl")
+  .populate("from", "firstName lastName fullName avatarUrl")
     .lean();
   res.json(swaps);
 });
