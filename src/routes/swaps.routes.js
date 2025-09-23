@@ -65,4 +65,14 @@ router.patch("/:id", authRequired, async (req, res) => {
   res.json(swap);
 });
 
+// GET /api/swaps/received
+router.get("/received", authRequired, async (req, res) => {
+  const userId = req.user.id;
+  const swaps = await SwapRequest.find({ to: userId })
+    .sort({ createdAt: -1 })
+    .populate("from", "fullName avatarUrl")
+    .lean();
+  res.json(swaps);
+});
+
 export default router;

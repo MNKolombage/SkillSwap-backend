@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
   skillsOffered: [String],
   avatarUrl: String,
   location: String,
+  bio: String,
   createdAt: { type: Date, default: Date.now }
 });
 
